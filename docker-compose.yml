@@ -1,0 +1,54 @@
+version: '3.3'
+
+volumes:
+  jenkins-data:
+
+secrets:
+  jenkins.pass:
+    file: ./jenkins.pass
+
+services:
+
+  jenkins:
+    build: ./jenkins
+    image: "rhub/cran-jenkins:0.0.1"
+    volumes:
+    - "jenkins-data:/var/jenkins_home"
+    - "/cran:/cran"
+    environment:
+    - JENKINS_ROOT_URL=https://cran.r-pkg.org
+    - JENKINS_USER=admin
+    secrets:
+    - jenkins.pass
+    ports:
+    - "8080:8080"
+    deploy:
+      restart_policy:
+        condition: any
+        delay: 5s
+        window: 60s
+
+  jenkins-seed:
+    build: ./seed
+    image: "rhub/cran-jenkins-seed:0.0.1"
+    depends_on:
+    - jenkins
+    environment:
+    - JENKINS_USER=admin
+    secrets:
+    - jenkins.pass
+    entrypoint:
+    - bash
+    - -c
+    - /seed/jenkins.sh
+    deploy:
+      restart_policy:
+        condition: on-failure
+
+  nginx:
+    build: ./nginx
+    image: "rhub/cran-nginx:0.0.1"
+    volumes:
+    - "/cran:/cran"
+    ports:
+    - "80:80"
