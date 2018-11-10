@@ -2,6 +2,8 @@
 
 rsync_mirror <- function() {
   system("rsync -rtlzv --delete cran.r-project.org::CRAN /cran/cran")
+  system("find /cran/cran -type d -exec chmod +x \\{\\} \\;")
+  system("chmod -R +r /cran/cran")
 }
 
 mkdirp <- function(x) {

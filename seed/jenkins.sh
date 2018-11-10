@@ -20,24 +20,30 @@ do
     sleep 1
 done
 
-# Then keep trying to add a job or update a job until one of them
-# succeeds.
+# We go over all jobs. For each job, we  keep trying to add or update it,
+# until one of them succeeds.
 
-while true
+for jobfile in $(cd /seed/jenkins/; ls *.xml);
 do
-    CRUMB=$(curl -s "${JENKINS_AUTH_URL}/crumbIssuer/api/xml?xpath=concat(//crumbRequestField,\":\",//crumb)")
-    if curl --fail -H "$CRUMB" \
-	    "${JENKINS_AUTH_URL}/createItem?name=cran-update" \
-	    --header "Content-Type: application/xml" \
-	    --data-binary @/seed/jenkins/cran-update.xml; then break;
-    fi
+    job=${jobfile%.xml}
+    echo "Adding job ${job}"
 
-    sleep 1
+    while true
+    do
+	CRUMB=$(curl -s "${JENKINS_AUTH_URL}/crumbIssuer/api/xml?xpath=concat(//crumbRequestField,\":\",//crumb)")
+	if curl --fail -H "$CRUMB" \
+		"${JENKINS_AUTH_URL}/createItem?name=${job}" \
+		--header "Content-Type: application/xml" \
+		--data-binary "@/seed/jenkins/${job}.xml"; then break;
+	fi
 
-    if curl --fail -H "$CRUMB" \
-	    "${JENKINS_AUTH_URL}/job/cran-update/config.xml" \
-	    --header "Content-Type: application/xml" \
-	    --data-binary @/seed/jenkins/cran-update.xml; then break;
-    fi
-    sleep 1
+	sleep 1
+
+	if curl --fail -H "$CRUMB" \
+		"${JENKINS_AUTH_URL}/job/${job}/config.xml" \
+		--header "Content-Type: application/xml" \
+		--data-binary "@/seed/jenkins/${job}.xml"; then break;
+	fi
+	sleep 1
+    done
 done

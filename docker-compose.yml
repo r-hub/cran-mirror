@@ -2,6 +2,7 @@ version: '3.3'
 
 volumes:
   jenkins-data:
+  apache-data:
 
 secrets:
   jenkins.pass:
@@ -14,6 +15,7 @@ services:
     image: "rhub/cran-jenkins:0.0.1"
     volumes:
     - "jenkins-data:/var/jenkins_home"
+    - "apache-data:/var/apache-data"
     - "/cran:/cran"
     environment:
     - JENKINS_ROOT_URL=https://cran.r-pkg.org
@@ -22,6 +24,7 @@ services:
     - jenkins.pass
     ports:
     - "8080:8080"
+    - "4402:4402"
     deploy:
       restart_policy:
         condition: any
@@ -45,10 +48,24 @@ services:
       restart_policy:
         condition: on-failure
 
-  nginx:
-    build: ./nginx
-    image: "rhub/cran-nginx:0.0.1"
+  apache:
+    build: ./apache
+    image: "rhub/cran-apache:0.0.1"
     volumes:
     - "/cran:/cran"
+    - "apache-data:/usr/local/apache2/conf"
+    entrypoint:
+    - sh
+    - -c
+    - /entrypoint.sh
+    deploy:
+      restart_policy:
+        condition: any
+        delay: 5s
+        window: 60s
+    environment:
+    - LETSENCRYPT_EMAIL=csardi.gabor@gmail.com
+    - CRAN_SERVER_NAME=cran.r-pkg.org
     ports:
     - "80:80"
+    - "443:443"

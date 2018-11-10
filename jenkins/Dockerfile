@@ -21,6 +21,13 @@ RUN apt-get update && apt-get install -y rsync
 
 RUN apt-get install -y r-base-core
 
+RUN apt-get install -y acmetool
+
+RUN mkdir -p /var/nginx-data && \
+    chown -R jenkins:jenkins /var/nginx-data
+
+ENV ACME_STATE_DIR /var/nginx-data/acmetool
+
 USER jenkins
 
 COPY scripts /var/jenkins_home/scripts
