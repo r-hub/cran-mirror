@@ -3,6 +3,7 @@ version: '3.3'
 volumes:
   jenkins-data:
   apache-data:
+  cert-data:
 
 secrets:
   jenkins.pass:
@@ -18,7 +19,7 @@ services:
     - "apache-data:/var/apache-data"
     - "/cran:/cran"
     environment:
-    - JENKINS_ROOT_URL=https://cran.r-pkg.org
+    - JENKINS_ROOT_URL=https://cran2.r-pkg.org
     - JENKINS_USER=admin
     secrets:
     - jenkins.pass
@@ -54,6 +55,7 @@ services:
     volumes:
     - "/cran:/cran"
     - "apache-data:/usr/local/apache2/conf"
+    - "cert-data:/etc/letsencrypt"
     entrypoint:
     - sh
     - -c
@@ -65,7 +67,7 @@ services:
         window: 60s
     environment:
     - LETSENCRYPT_EMAIL=csardi.gabor@gmail.com
-    - CRAN_SERVER_NAME=cran.r-pkg.org
+    - CRAN_SERVER_NAME=cran2.r-pkg.org
     ports:
     - "80:80"
     - "443:443"

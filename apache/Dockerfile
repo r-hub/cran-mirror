@@ -1,8 +1,10 @@
 
-FROM httpd:2.4.37-alpine
+FROM httpd:2.4.35-alpine
 
-COPY conf /conf
-COPY entrypoint.sh /entrypoint.sh
+RUN apk add --no-cache certbot py2-pip
 
 RUN mkdir -p /cran && \
     chown daemon:daemon /cran
+
+COPY conf /conf
+COPY entrypoint.sh /entrypoint.sh
