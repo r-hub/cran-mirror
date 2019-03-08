@@ -21,6 +21,10 @@ RUN apt-get update && apt-get install -y rsync
 
 RUN apt-get install -y r-base-core
 
+RUN echo 'options(repos = c(CRAN = "https://cloud.r-project.org"))' \
+    >> ~/.Rprofile && \
+    Rscript -e 'install.packages("desc")'
+
 RUN apt-get install -y acmetool
 
 RUN mkdir -p /var/nginx-data && \
