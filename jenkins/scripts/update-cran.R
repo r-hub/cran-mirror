@@ -12,6 +12,14 @@ mkdirp <- function(x) {
 
 `%||%` <- function(l, r) if (is.null(l)) r else l
 
+is_na1 <- function(x) {
+  identical(x, NA_character_) || identical(x, NA_integer_) ||
+    identical(x, NA_real_) || identical(x, NA_complex_) ||
+    identical(x, NA)
+}
+
+`%|NA|%` <- function(l, r) if (is_na1(l)) r else l
+
 get_ext <- function(pkgdir) {
   if (grepl("windows", pkgdir)) {
     ".zip"
@@ -53,10 +61,34 @@ get_pkgs <- function(pkgdir) {
   files
 }
 
-update_metadata <- function(d) {
+get_desc_tar <- function(f, p) {
+  cmd <- sprintf(
+    "zcat \"%s\" | head -c 200000 | tar -xOf - %s/DESCRIPTION 2>/dev/null",
+    f, p)
+  tryCatch(
+    system(cmd, intern = TRUE),
+    warning = function(e) {
+      system(sprintf("tar -xOf \"%s\" %s/DESCRIPTION", f, p), intern = TRUE)
+    })
+}
+
+get_desc_zip <- function(f, p) {
+  cmd <- sprintf("unzip -p \"%s\" %s/DESCRIPTION", f, p)
+  system(cmd, intern = TRUE)
+}
+
+get_sysreqs <- function(files) {
+  pkgs <- sub("_.*$", "", basename(files))
+  mapply(files, pkgs, USE.NAMES = FALSE, FUN = function(f, p) {
+    d <- if (grepl("\\.zip$", f)) get_desc_zip(f, p) else get_desc_tar(f, p)
+    desc::desc(text = d)$get("SystemRequirements")[[1]] %|NA|% ""
+  })
+}
+
+update_metadata <- function(d, update_all = FALSE) {
   message("Creating metadata for ", d)
   pkgdir <- file.path("/cran/cran/", d)
-  output <- file.path("/cran/metadata", d, "METADATA.gz")
+  output <- file.path("/cran/metadata", d, "METADATA2.gz")
   mkdirp(dirname(output))
 
   pkgs <- get_pkgs(pkgdir)
@@ -65,9 +97,8 @@ update_metadata <- function(d) {
     return()
   }
 
-  if (file.exists(output)) {
-    ex <- read.csv(gzfile(output), header = FALSE, stringsAsFactors = FALSE)
-    names(ex) <- c("file", "size", "sha")
+  if (!update_all && file.exists(output)) {
+    ex <- read.csv(gzfile(output), header = TRUE, stringsAsFactors = FALSE)
 
     ## Remove the files that do not exist in the new DB
     ex <- ex[ex[,1] %in% pkgs, ]
@@ -95,12 +126,15 @@ update_metadata <- function(d) {
     cat(file.path(pkgdir, new), file = tmp <- tempfile(), sep = "\n")
     new_chk <- system(sprintf("shasum -a 256 $(cat \"%s\")", tmp),
                       intern = TRUE)
+    sysreqs <- get_sysreqs(file.path(pkgdir, new))
+    sysreqs <- gsub("\r?\n[ ]*", " ", sysreqs)
 
     newdf <- data.frame(
       stringsAsFactors = FALSE,
       file = new,
       size = new_size,
-      sha = sub("\\s+.*$", "", new_chk))
+      sha = sub("\\s+.*$", "", new_chk),
+      sysreqs = sysreqs)
 
   } else {
     newdf <- NULL
@@ -110,12 +144,11 @@ update_metadata <- function(d) {
   all <- all[ order(all[,1]), ]
 
   outcon <- gzcon(file(output, "wb"))
-  write.table(all, outcon, quote = FALSE, sep = ",",
-              row.names = FALSE, col.names = FALSE)
+  write.csv(all, outcon, row.names = FALSE)
   close(outcon)
 }
 
-update_package_dirs <- function() {
+update_package_dirs <- function(update_all = FALSE) {
   wd <- getwd()
   setwd("/cran/cran")
   on.exit(setwd(wd), add = TRUE)
@@ -124,7 +157,7 @@ update_package_dirs <- function() {
   ))
 
   dirs <- sub("^/cran/cran/", "", dirs)
-  for (d in dirs) update_metadata(d)
+  for (d in dirs) update_metadata(d, update_all = update_all)
 }
 
 main <- function() {
@@ -132,4 +165,5 @@ main <- function() {
   update_package_dirs()
 }
 
-main()
+## We do not run this if the script is source()-d.
+if (is.null(sys.calls())) main()
