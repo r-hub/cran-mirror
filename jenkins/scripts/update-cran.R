@@ -77,19 +77,26 @@ get_desc_zip <- function(f, p) {
   system(cmd, intern = TRUE)
 }
 
-get_sysreqs <- function(files) {
+get_desc_data <- function(files) {
   pkgs <- sub("_.*$", "", basename(files))
-  mapply(files, pkgs, USE.NAMES = FALSE, FUN = function(f, p) {
+  dd <- mapply(files, pkgs, USE.NAMES = FALSE, FUN = function(f, p) {
     d <- if (grepl("\\.zip$", f)) get_desc_zip(f, p) else get_desc_tar(f, p)
-    desc::desc(text = d)$get("SystemRequirements")[[1]] %|NA|% ""
+    dsc <- desc::desc(text = d)
+    c(sysreqs = dsc$get("SystemRequirements")[[1]] %|NA|% "",
+      built = dsc$get("Built")[[1]] %|NA|% "",
+      published = dsc$get("Date/Publication")[[1]] %|NA|% "")
   })
+
+  as.data.frame(t(dd), stringsAsFactors = FALSE)
 }
 
 update_metadata <- function(d, update_all = FALSE) {
   message("Creating metadata for ", d)
   pkgdir <- file.path("/cran/cran/", d)
-  output <- file.path("/cran/metadata", d, "METADATA2.gz")
+  output <- file.path("/cran/metadata", d, "METADATA.gz")
+  output2 <- file.path("/cran/metadata", d, "METADATA2.gz")
   mkdirp(dirname(output))
+  mkdirp(dirname(output2))
 
   pkgs <- get_pkgs(pkgdir)
   if (is.null(pkgs)) {
@@ -97,8 +104,8 @@ update_metadata <- function(d, update_all = FALSE) {
     return()
   }
 
-  if (!update_all && file.exists(output)) {
-    ex <- read.csv(gzfile(output), header = TRUE, stringsAsFactors = FALSE)
+  if (!update_all && file.exists(output2)) {
+    ex <- read.csv(gzfile(output2), header = TRUE, stringsAsFactors = FALSE)
 
     ## Remove the files that do not exist in the new DB
     ex <- ex[ex[,1] %in% pkgs, ]
@@ -108,7 +115,7 @@ update_metadata <- function(d, update_all = FALSE) {
 
     ## Updated files in the DB, remove these from ex, they need update
     new <- unique(c(new, pkgs[file.mtime(file.path(pkgdir, pkgs)) >
-                              file.mtime(output)]))
+                              file.mtime(output2)]))
     ex <- ex[! ex[,1] %in% new, ]
 
   } else {
@@ -119,6 +126,7 @@ update_metadata <- function(d, update_all = FALSE) {
 
   ## Only keep the ones that actually exist
   new <- new[file.exists(file.path(pkgdir, new))]
+  cat("Updating", length(new), "files\n")
 
   if (length(new)) {
     ## Add new files
@@ -126,15 +134,17 @@ update_metadata <- function(d, update_all = FALSE) {
     cat(file.path(pkgdir, new), file = tmp <- tempfile(), sep = "\n")
     new_chk <- system(sprintf("shasum -a 256 $(cat \"%s\")", tmp),
                       intern = TRUE)
-    sysreqs <- get_sysreqs(file.path(pkgdir, new))
-    sysreqs <- gsub("\r?\n[ ]*", " ", sysreqs)
 
     newdf <- data.frame(
       stringsAsFactors = FALSE,
       file = new,
       size = new_size,
-      sha = sub("\\s+.*$", "", new_chk),
-      sysreqs = sysreqs)
+      sha = sub("\\s+.*$", "", new_chk))
+
+    ## Add data from DESCRIPTION
+    desc_data <- get_desc_data(file.path(pkgdir, new))
+    newdf <- cbind(newdf, desc_data)
+    newdf$sysreqs <- gsub("\r?\n[ ]*", " ", newdf$sysreqs)
 
   } else {
     newdf <- NULL
@@ -143,8 +153,14 @@ update_metadata <- function(d, update_all = FALSE) {
   all <- rbind(newdf, ex)
   all <- all[ order(all[,1]), ]
 
-  outcon <- gzcon(file(output, "wb"))
+  outcon <- gzcon(file(output2, "wb"))
   write.csv(all, outcon, row.names = FALSE)
+  close(outcon)
+
+  ## This is for compatibility
+  outcon <- gzcon(file(output, "wb"))
+  write.table(all[,1:3], outcon, quote = FALSE, sep = ",",
+              row.names = FALSE, col.names = FALSE)
   close(outcon)
 }
 
