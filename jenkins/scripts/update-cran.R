@@ -114,8 +114,11 @@ update_metadata <- function(d, update_all = FALSE) {
     new <- setdiff(pkgs, ex[,1])
 
     ## Updated files in the DB, remove these from ex, they need update
-    new <- unique(c(new, pkgs[file.mtime(file.path(pkgdir, pkgs)) >
-                              file.mtime(output2)]))
+    ## Because of the lag of the mirroring, we need to leave more time
+    ## between the file update times. Ideally, we would put the file's
+    ## mtime in the data...
+    ft <- file.mtime(file.path(pkgdir, pkgs)) + as.difftime(4, units = "days")
+    new <- unique(c(new, pkgs[ft > file.mtime(output2)]))
     ex <- ex[! ex[,1] %in% new, ]
 
   } else {
