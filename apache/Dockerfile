@@ -1,7 +1,7 @@
 
-FROM httpd:2.4.35-alpine
+FROM httpd:2.4.51-alpine
 
-RUN apk add --no-cache certbot py2-pip
+RUN apk add --no-cache certbot
 
 RUN mkdir -p /cran && \
     chown daemon:daemon /cran

@@ -13,7 +13,7 @@ services:
 
   jenkins:
     build: ./jenkins
-    image: "rhub/cran-jenkins:0.0.1"
+    image: "rhub/cran-jenkins:0.0.2"
     volumes:
     - "jenkins-data:/var/jenkins_home"
     - "apache-data:/var/apache-data"
@@ -34,7 +34,7 @@ services:
 
   jenkins-seed:
     build: ./seed
-    image: "rhub/cran-jenkins-seed:0.0.1"
+    image: "rhub/cran-jenkins-seed:0.0.2"
     depends_on:
     - jenkins
     environment:
@@ -51,7 +51,7 @@ services:
 
   apache:
     build: ./apache
-    image: "rhub/cran-apache:0.0.1"
+    image: "rhub/cran-apache:0.0.2"
     volumes:
     - "/cran:/cran"
     - "apache-data:/usr/local/apache2/conf"
